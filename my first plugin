@@ -1,0 +1,18 @@
+<?php
+/**
+ * Plugin Name: My First Plugin
+ * Plugin URI:  https://example.com/my-first-plugin
+ * Description: This is my first WordPress plugin.
+ * Version:     1.0.0
+ * Author:      Your Name
+ * Author URI:  https://example.com
+ * License:     GPL2
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: my-first-plugin
+ */
+
+function my_first_plugin_footer_message() {
+  echo '<p>This is a message from my first plugin!</p>';
+}
+
+add_action('wp_footer', 'my_first_plugin_footer_message');
