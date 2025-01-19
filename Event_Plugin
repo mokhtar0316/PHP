@@ -1,0 +1,270 @@
+<?php
+/**
+ * Plugin Name: Event Management Plugin
+ * Plugin URI:  https://example.com/event-management-plugin
+ * Description: A simple event management plugin for WordPress.
+ * Version:     1.0.0
+ * Author:      GapGPT
+ * Author URI:  https://example.com/
+ * License:     GPL2
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: event-management
+ * Domain Path: /languages
+ */
+
+// Prevent direct access
+if ( ! defined( 'WPINC' ) ) {
+	die;
+}
+
+// Load text domain
+function em_load_textdomain() {
+    load_plugin_textdomain( 'event-management', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+}
+add_action( 'plugins_loaded', 'em_load_textdomain' );
+
+
+// Define custom post type for events
+function em_register_event_post_type() {
+    $labels = array(
+        'name'               => _x( 'Events', 'post type general name', 'event-management' ),
+        'singular_name'      => _x( 'Event', 'post type singular name', 'event-management' ),
+        'menu_name'          => _x( 'Events', 'admin menu', 'event-management' ),
+        'name_admin_bar'     => _x( 'Event', 'add new on admin bar', 'event-management' ),
+        'add_new'            => _x( 'Add New', 'event', 'event-management' ),
+        'add_new_item'       => __( 'Add New Event', 'event-management' ),
+        'new_item'           => __( 'New Event', 'event-management' ),
+        'edit_item'          => __( 'Edit Event', 'event-management' ),
+        'view_item'          => __( 'View Event', 'event-management' ),
+        'all_items'          => __( 'All Events', 'event-management' ),
+        'search_items'       => __( 'Search Events', 'event-management' ),
+        'parent_item_colon'  => __( 'Parent Events:', 'event-management' ),
+        'not_found'          => __( 'No events found.', 'event-management' ),
+        'not_found_in_trash' => __( 'No events found in Trash.', 'event-management' ),
+    );
+
+    $args = array(
+        'labels'             => $labels,
+        'public'             => true,
+        'publicly_queryable' => true,
+        'show_ui'            => true,
+        'show_in_menu'       => true,
+        'query_var'          => true,
+        'rewrite'            => array( 'slug' => 'event' ),
+        'capability_type'    => 'post',
+        'has_archive'        => true,
+        'hierarchical'       => false,
+        'menu_position'      => null,
+        'supports'           => array( 'title', 'editor', 'thumbnail', 'custom-fields' ),
+    );
+
+    register_post_type( 'event', $args );
+}
+add_action( 'init', 'em_register_event_post_type' );
+
+// Add custom meta box for event details
+function em_event_details_meta_box() {
+    add_meta_box(
+        'event_details_metabox',
+        __( 'Event Details', 'event-management' ),
+        'em_event_details_metabox_callback',
+        'event',
+        'normal',
+        'high'
+    );
+}
+add_action( 'add_meta_boxes', 'em_event_details_meta_box' );
+
+// Meta box callback function
+function em_event_details_metabox_callback( $post ) {
+    wp_nonce_field( 'event_details_nonce', 'event_details_nonce' );
+    $event_date = get_post_meta( $post->ID, '_event_date', true );
+    $event_location = get_post_meta( $post->ID, '_event_location', true );
+    $event_capacity = get_post_meta( $post->ID, '_event_capacity', true );
+    $event_registration_open = get_post_meta( $post->ID, '_event_registration_open', true );
+
+    ?>
+    <label for="event_date"><?php _e( 'Event Date:', 'event-management' ); ?></label>
+    <input type="datetime-local" id="event_date" name="event_date" value="<?php echo esc_attr( $event_date ); ?>"><br><br>
+
+    <label for="event_location"><?php _e( 'Event Location:', 'event-management' ); ?></label>
+    <input type="text" id="event_location" name="event_location" value="<?php echo esc_attr( $event_location ); ?>"><br><br>
+
+    <label for="event_capacity"><?php _e( 'Event Capacity:', 'event-management' ); ?></label>
+    <input type="number" id="event_capacity" name="event_capacity" value="<?php echo esc_attr( $event_capacity ); ?>"><br><br>
+
+    <label for="event_registration_open"><?php _e( 'Registration Open:', 'event-management' ); ?></label>
+    <input type="checkbox" id="event_registration_open" name="event_registration_open" <?php checked( $event_registration_open, 'on' ); ?>><br><br>
+    <?php
+}
+
+// Save meta data
+function em_save_event_details( $post_id ) {
+    if ( ! isset( $_POST['event_details_nonce'] ) || ! wp_verify_nonce( $_POST['event_details_nonce'], 'event_details_nonce' ) ) {
+        return;
+    }
+
+    if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+        return;
+    }
+
+    if ( ! isset( $_POST['post_type'] ) || 'event' !== $_POST['post_type'] ) {
+        return;
+    }
+
+    if ( ! current_user_can( 'edit_post', $post_id ) ) {
+        return;
+    }
+
+    if ( isset( $_POST['event_date'] ) ) {
+        update_post_meta( $post_id, '_event_date', sanitize_text_field( $_POST['event_date'] ) );
+    }
+
+    if ( isset( $_POST['event_location'] ) ) {
+        update_post_meta( $post_id, '_event_location', sanitize_text_field( $_POST['event_location'] ) );
+    }
+
+    if ( isset( $_POST['event_capacity'] ) ) {
+        update_post_meta( $post_id, '_event_capacity', intval( $_POST['event_capacity'] ) );
+    }
+    
+    if ( isset( $_POST['event_registration_open'] ) ) {
+      update_post_meta( $post_id, '_event_registration_open', 'on' );
+    } else {
+       update_post_meta( $post_id, '_event_registration_open', 'off' );
+    }
+
+}
+add_action( 'save_post', 'em_save_event_details' );
+
+// Shortcode to display event registration form
+function em_event_registration_form_shortcode( $atts ) {
+    $atts = shortcode_atts( array(
+        'id' => '',
+    ), $atts, 'event_registration_form' );
+
+    $event_id = intval( $atts['id'] );
+
+    if ( ! $event_id ) {
+        return __( 'Invalid event ID.', 'event-management' );
+    }
+
+    $event = get_post( $event_id );
+    if ( ! $event || $event->post_type !== 'event' ) {
+        return __( 'Event not found.', 'event-management' );
+    }
+
+    $event_date = get_post_meta( $event_id, '_event_date', true );
+    $event_location = get_post_meta( $event_id, '_event_location', true );
+    $event_capacity = get_post_meta( $event_id, '_event_capacity', true );
+    $event_registration_open = get_post_meta( $event_id, '_event_registration_open', true );
+    
+    if ($event_registration_open != 'on'){
+       return __( 'Registration is closed for this event', 'event-management' );
+    }
+
+    $registered_count = get_post_meta( $event_id, '_event_registered_count', true ) ? intval( get_post_meta( $event_id, '_event_registered_count', true ) ) : 0;
+
+
+    if ( $registered_count >= $event_capacity && $event_capacity !=0 ) {
+        return __( 'Event is full.', 'event-management' );
+    }
+
+
+    ob_start();
+    ?>
+    <h3><?php echo esc_html( $event->post_title ); ?></h3>
+    <p><strong><?php _e( 'Date:', 'event-management' ); ?></strong> <?php echo esc_html( $event_date ); ?></p>
+    <p><strong><?php _e( 'Location:', 'event-management' ); ?></strong> <?php echo esc_html( $event_location ); ?></p>
+     <?php if ($event_capacity != 0):?>
+        <p><strong><?php _e( 'Capacity:', 'event-management' ); ?></strong> <?php echo esc_html( $event_capacity ); ?></p>
+     <?php endif;?>
+    <p><strong><?php _e( 'Registered Count:', 'event-management' ); ?></strong> <?php echo esc_html( $registered_count ); ?></p>
+    <form method="post" id="event-registration-form">
+        <input type="hidden" name="event_id" value="<?php echo esc_attr( $event_id ); ?>">
+        <input type="hidden" name="action" value="event_registration">
+       <?php wp_nonce_field('event_registration_nonce','event_registration_nonce');?>
+        <button type="submit"><?php _e( 'Register', 'event-management' ); ?></button>
+    </form>
+    <?php
+    return ob_get_clean();
+}
+add_shortcode( 'event_registration_form', 'em_event_registration_form_shortcode' );
+
+
+// Handle registration form submission
+function em_handle_event_registration() {
+     if ( ! isset( $_POST['event_registration_nonce'] ) || ! wp_verify_nonce( $_POST['event_registration_nonce'], 'event_registration_nonce' ) ) {
+        return;
+    }
+
+    if ( ! isset( $_POST['action'] ) || 'event_registration' !== $_POST['action'] ) {
+        return;
+    }
+
+    $event_id = isset( $_POST['event_id'] ) ? intval( $_POST['event_id'] ) : 0;
+    if ( ! $event_id ) {
+        return;
+    }
+
+    $event = get_post( $event_id );
+    if ( ! $event || $event->post_type !== 'event' ) {
+        return;
+    }
+
+    $event_capacity = get_post_meta( $event_id, '_event_capacity', true );
+    $registered_count = get_post_meta( $event_id, '_event_registered_count', true ) ? intval( get_post_meta( $event_id, '_event_registered_count', true ) ) : 0;
+
+    if ( $registered_count >= $event_capacity && $event_capacity != 0) {
+          wp_die( __( 'Event is full.', 'event-management' ) );
+       return;
+     }
+
+    $registered_count++;
+    update_post_meta( $event_id, '_event_registered_count', $registered_count );
+    wp_die( __( 'Successfully Registered!', 'event-management' ) );
+}
+add_action( 'wp_loaded', 'em_handle_event_registration' );
+
+/*
+توضیحات:
+
+Header پلاگین: اطلاعات کلی پلاگین مثل نام، توضیحات، نسخه و غیره رو مشخص می‌کنه.
+بارگذاری دامنه متنی: برای ترجمه پلاگین به زبان‌های دیگه استفاده میشه.
+ثبت نوع نوشته سفارشی (Custom Post Type) رویداد:
+یک نوع پست سفارشی به نام event ایجاد می‌کنه. این یعنی شما می‌تونید پست‌های جدیدی با عنوان “رویداد” در پیشخوان وردپرس خودتون ایجاد کنید.
+تنظیمات مختلفی مثل برچسب‌ها، قابلیت‌های ویرایشی و غیره رو مشخص می‌کنه.
+افزودن متاباکس (Meta Box) جزئیات رویداد:
+یک متاباکس جدید به نام “جزئیات رویداد” در صفحه ویرایش پست‌های event اضافه می‌کنه.
+میدان‌هایی برای وارد کردن تاریخ رویداد، مکان، ظرفیت و وضعیت ثبت نام (باز/بسته) اضافه می‌کنه.
+تابع فراخوان متاباکس:
+محتوای متاباکس رو تولید می‌کنه.
+میدان‌های ورودی رو با استفاده از مقادیر ذخیره شده پر می‌کنه.
+ذخیره متا داده:
+هنگام ذخیره یک پست event، اطلاعات وارد شده در متاباکس رو در قالب متا داده ذخیره می‌کنه.
+شورتکد برای نمایش فرم ثبت‌نام رویداد:
+یک شورتکد به نام [event_registration_form] ایجاد می‌کنه.
+این شورتکد با دریافت شناسه رویداد، فرم ثبت‌نام برای آن رویداد رو نمایش میده.
+اطلاعات رویداد (تاریخ، مکان و غیره) رو نمایش میده.
+یک فرم ساده برای ثبت‌نام کاربر ایجاد می‌کنه.
+بررسی میکند که آیا ثبت نام برای این رویداد باز است یا خیر و اگر ظرفیت رویداد پر باشد پیغام مناسب را نشان میدهد.
+مدیریت ارسال فرم ثبت‌نام:
+هنگامی که کاربر فرم ثبت‌نام رو ارسال می‌کنه، این تابع اجرا میشه.
+تعداد ثبت‌نام کننده‌ها رو در متا داده رویداد افزایش میده.
+یک پیام تایید ثبت‌نام به کاربر نشون میده.
+بررسی میکند که آیا ظرفیت رویداد پر شده است یا خیر و اگر پر باشد پیامی به کاربر نمایش میدهد.
+نحوه استفاده:
+
+پلاگین رو در پوشه wp-content/plugins وردپرس خودتون آپلود کنید.
+پلاگین رو از بخش “پلاگین‌ها” در پیشخوان وردپرس فعال کنید.
+یک پست جدید از نوع “رویداد” ایجاد کنید.
+اطلاعات رویداد (تاریخ، مکان و غیره) رو در متاباکس “جزئیات رویداد” وارد کنید.
+در صفحه‌ای که می‌خواید فرم ثبت‌نام رو نمایش بدید، از شورتکد [event_registration_form id="شناسه رویداد"] استفاده کنید. به جای شناسه رویداد، شناسه پست رویداد مورد نظرتون رو قرار بدید.
+نکات مهم:
+
+این یک پلاگین ساده است و می‌تونید اون رو بر اساس نیازتون توسعه بدید.
+بهتره قبل از استفاده در سایت اصلی، در یک محیط آزمایشی تستش کنید.
+برای استفاده از ترجمه، باید فایل ترجمه .mo رو در پوشه languages پلاگین قرار بدید.
+برای امنیت بیشتر، می توانید ورودی های فرم ثبت نام را اعتبارسنجی کنید.
+امیدوارم این پلاگین براتون مفید باشه. اگه سوال دیگه‌ای دارید، بپرسید.
+*/
