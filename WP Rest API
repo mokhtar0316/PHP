@@ -1,0 +1,21 @@
+<?php
+/*
+Plugin Name: My Custom API
+Description: A custom API for WordPress
+Version: 1.0
+Author: Your Name
+*/
+
+add_action('rest_api_init', function () {
+    register_rest_route('myplugin/v1', '/data/', array(
+        'methods' => 'GET',
+        'callback' => 'my_custom_api_data',
+    ));
+});
+
+function my_custom_api_data($data) {
+    return new WP_REST_Response(array(
+        'message' => 'Hello, this is a custom API response!',
+        'status' => 200,
+    ));
+}
