@@ -1,0 +1,39 @@
+<?php
+/**
+ * Plugin Name: Cookie Example Plugin
+ * Plugin URI:  https://example.com
+ * Description: A simple WordPress plugin that uses cookies.
+ * Version:     1.0.0
+ * Author:      GapGPT
+ * Author URI:  https://example.com
+ * License:     GPL2
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: cookie-plugin
+ * Domain Path: /languages
+ */
+
+// If this file is called directly, abort.
+if ( ! defined( 'WPINC' ) ) {
+	die;
+}
+
+// Function to set cookie
+function cookie_plugin_set_cookie() {
+    if ( ! isset( $_COOKIE['cookie_plugin_example'] ) ) {
+        $cookie_value = 'Hello, Cookie!';
+        setcookie( 'cookie_plugin_example', $cookie_value, time() + ( 86400 * 30 ), '/' ); // Cookie expires after 30 days
+    }
+}
+add_action( 'init', 'cookie_plugin_set_cookie' );
+
+// Function to display cookie value
+function cookie_plugin_display_cookie() {
+    if ( isset( $_COOKIE['cookie_plugin_example'] ) ) {
+        $cookie_value = esc_html( $_COOKIE['cookie_plugin_example'] );
+        echo '<p>Cookie Value: ' . $cookie_value . '</p>';
+    } else {
+        echo '<p>Cookie not set yet.</p>';
+    }
+}
+add_action( 'wp_footer', 'cookie_plugin_display_cookie' );
+
